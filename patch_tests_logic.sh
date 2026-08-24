@@ -1,0 +1,2 @@
+sed -i "s/expect(context.awareness?.excitementEmitted).toBe(true);/const res = updateBotV2(snapshot, context); expect(res.events.some((e: any) => e.type === 'PLAY_EXCITEMENT_SOUND')).toBe(true);/g" src/games/circuit-climb/bot-ai-v2/botAI.v2.test.ts
+sed -i "s/expect(context.plannerResult?.path.length).toBeGreaterThan(0);/expect(context.plannerResult?.path?.length || 0).toBeGreaterThan(0);/g" src/games/circuit-climb/bot-ai-v2/botAI.v2.test.ts

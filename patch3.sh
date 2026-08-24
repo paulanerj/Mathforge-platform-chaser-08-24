@@ -1,0 +1,1 @@
+sed -i 's/return React.createElement('\''canvas'\'', { ref: api.canvasRef, width: 400, height: 800 });/return React.createElement('\''canvas'\'', { ref: (el) => { if(el) el.getBoundingClientRect = () => ({width:400,height:800}); api.canvasRef.current = el; }, width: 400, height: 800 });/g' src/games/circuit-climb/bot-ai-v2/botAI.v2.test.ts

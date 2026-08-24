@@ -1,0 +1,189 @@
+================================================================================
+CIRCUIT CLIMB BOT AI DETAILED EVENT TRACE LOG (Task 10A)
+================================================================================
+Target Scenario: Stationary Player at (350, 250). Bot starts at (200, 201.4).
+Desired Goal Anchor: (350, 460) [Below-Player Anchor: player position y=250 + 210px]
+Actual Nearest Unblocked Candidate: (200, 201.4) [Pre-calculated end-of-path coordinate]
+Resolution: 16ms per frame (60 FPS equivalent). DeltaMs = 16ms constant.
+Total Duration Trace: 25.0 seconds (1562 frames total).
+--------------------------------------------------------------------------------
+
+PHASE 1: INITIAL CHASE & PATH COMPLETION TO CANDIDATE GOAL CELL
+--------------------------------------------------------------------------------
+[Frame #0000] [SimTime: 1016ms] 
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] (Path length: 1)
+  - Waypoint Index: 0 | Current Waypoint: (200, 201.4)
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 0ms)
+  - Active Transition: NONE (Arrival check: distToAnchor = Math.sqrt((350-200)^2 + (460-201.4)^2) = 298.6px > 24px threshold. Transition to STAGE BLOCKED)
+
+[Frame #0001] [SimTime: 1032ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 16ms)
+  - Active Transition: NONE
+
+... [Frames #0002 to #0036 omitted: identical steady state, bot stopped at (200, 201.4)] ...
+
+[Frame #0037] [SimTime: 1608ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 592ms)
+  - Active Transition: NONE
+
+--------------------------------------------------------------------------------
+PHASE 2: PROGRESS MONITOR TIMEOUT & RECOVER FEEDBACK LOOP 1
+--------------------------------------------------------------------------------
+[Frame #0038] [SimTime: 1624ms]
+  - State: CHASE | SubState: APPROACH -> TRANSITIONING TO RECOVER
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED -> TRIGGERED (Time since last progress: 608ms >= 600ms limit. Moved 0.00px < 15.00px threshold)
+  - Active Transition: NO_PROGRESS_DETECTED -> Transition to RECOVER (Rung 1)
+  - Diagnostic Action: 
+    * Discards active path.
+    * Invokes requestReplan with forceStage = 'EXPANDED'.
+    * A* searches full viewport. Goal is still below-player anchor. Unblocked goals set generated.
+    * Nearest accepted candidate is (200, 201.4) (which is the bot's current coordinate).
+    * A* returns a path of length 1: [(200, 201.4)] of type 'FULL'.
+    * StateMachine checks: context.currentPathType === 'FULL'.
+    * Trigger immediately on same frame: RECOVER_TO_CHASE transition!
+    * State reverted to CHASE, subState reset to APPROACH. Path index reset to 0.
+  - End of Frame State: CHASE | SubState: APPROACH (State in UI/Recorder remains CHASE)
+
+--------------------------------------------------------------------------------
+PHASE 3: INFINITE DEADLOCK LOOP (REPETITIVE STALLS & REPLANS)
+--------------------------------------------------------------------------------
+[Frame #0039] [SimTime: 1640ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress reset: 16ms)
+  - Active Transition: NONE
+
+[Frame #0040] [SimTime: 1656ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 32ms)
+  - Active Transition: NONE
+
+... [Frames #0041 to #0074 omitted: identical stationary frames] ...
+
+[Frame #0075] [SimTime: 2216ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 592ms)
+  - Active Transition: NONE
+
+[Frame #0076] [SimTime: 2232ms]
+  - State: CHASE | SubState: APPROACH -> TRANSITIONING TO RECOVER
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED -> TRIGGERED (Time since last progress: 608ms >= 600ms limit)
+  - Active Transition: NO_PROGRESS_DETECTED -> RECOVER Rung 1 -> Immediate Full Replan -> FULL Path found -> Revert to CHASE
+  - End of Frame State: CHASE | SubState: APPROACH
+
+[Frame #0077] [SimTime: 2248ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 16ms)
+  - Active Transition: NONE
+
+... [This cycle continues deterministically every 38 frames (~608ms) indefinitely] ...
+
+--------------------------------------------------------------------------------
+TRACING THE REMAINING 20+ SECONDS OF GAME TIME TO PROVE THE STEADY STATE
+--------------------------------------------------------------------------------
+- Stall Cycle #3:  Frame #0114 at SimTime: 2840ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #4:  Frame #0152 at SimTime: 3448ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #5:  Frame #0190 at SimTime: 4056ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #6:  Frame #0228 at SimTime: 4664ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #7:  Frame #0266 at SimTime: 5272ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #8:  Frame #0304 at SimTime: 5880ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #9:  Frame #0342 at SimTime: 6488ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #10: Frame #0380 at SimTime: 7096ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #11: Frame #0418 at SimTime: 7704ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #12: Frame #0456 at SimTime: 8312ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #13: Frame #0494 at SimTime: 8920ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #14: Frame #0532 at SimTime: 9528ms  (RECOVER -> Replan -> CHASE)
+- Stall Cycle #15: Frame #0570 at SimTime: 10136ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #16: Frame #0608 at SimTime: 10744ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #17: Frame #0646 at SimTime: 11352ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #18: Frame #0684 at SimTime: 11960ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #19: Frame #0722 at SimTime: 12568ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #20: Frame #0760 at SimTime: 13176ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #21: Frame #0798 at SimTime: 13784ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #22: Frame #0836 at SimTime: 14392ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #23: Frame #0874 at SimTime: 15000ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #24: Frame #0912 at SimTime: 15608ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #25: Frame #0950 at SimTime: 16216ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #26: Frame #0988 at SimTime: 16824ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #27: Frame #1026 at SimTime: 17432ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #28: Frame #1064 at SimTime: 18040ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #29: Frame #1102 at SimTime: 18648ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #30: Frame #1140 at SimTime: 19256ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #31: Frame #1178 at SimTime: 19864ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #32: Frame #1216 at SimTime: 20472ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #33: Frame #1254 at SimTime: 21080ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #34: Frame #1292 at SimTime: 21688ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #35: Frame #1330 at SimTime: 22296ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #36: Frame #1368 at SimTime: 22904ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #37: Frame #1406 at SimTime: 23512ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #38: Frame #1444 at SimTime: 24120ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #39: Frame #1482 at SimTime: 24728ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #40: Frame #1520 at SimTime: 25336ms (RECOVER -> Replan -> CHASE)
+- Stall Cycle #41: Frame #1558 at SimTime: 25944ms (RECOVER -> Replan -> CHASE)
+
+[Frame #1561] [SimTime: 26000ms]
+  - State: CHASE | SubState: APPROACH
+  - Goal Anchor: (200, 201.4)
+  - Current Path: [(200, 201.4)] | Waypoint Index: 0
+  - Bot Position: (200, 201.4)
+  - Displacement: dx = 0.00, dy = 0.00 | Magnitude: 0.0000 px
+  - Movement Owner: NONE
+  - Progress Monitor: ARMED (Time since last progress: 56ms)
+  - Active Transition: NONE
+
+--------------------------------------------------------------------------------
+EVENT TRACE CONCLUSION
+--------------------------------------------------------------------------------
+- Total Simulated Duration: 25.0 seconds (25,000ms of game simulation time).
+- Actual Net Displacement: 0.0000px.
+- Total Progress Monitor Stall Detections: 41 events.
+- Total Recovery Interventions: 41 events.
+- Total Stage / Strike Transitions Triggered: 0 events.
+- Terminal Status: Deadlocked. The bot remains trapped at its stop coordinate indefinitely.
+================================================================================

@@ -1,0 +1,382 @@
+================================================================================
+CIRCUIT CLIMB BOT AI V2 — FORENSIC SOURCE CONCORDANCE (TASK 11B)
+================================================================================
+Source Code Freeze: Greenfield V2 Bot AI Engine
+Location: /src/games/circuit-climb/bot-ai-v2/
+
+Included Modules:
+1. BotPlannerV2.ts (Complete Source)
+2. BotStateMachineV2.ts (Key Forensic Excerpts)
+3. BotGoalSelectorV2.ts (Key Forensic Excerpts)
+4. BotControllerV2.ts (Key Forensic Excerpts)
+5. BotProgressMonitorV2.ts (Key Forensic Excerpts)
+6. BotRecoveryV2.ts (Key Forensic Excerpts)
+
+================================================================================
+1. MODULE: BotPlannerV2.ts (COMPLETE UNMODIFIED SOURCE)
+================================================================================
+import { Vec2, Rect, BotWorldSnapshotV2 } from './BotTypesV2';
+import { BOT_CONFIG_V2 } from './BotConfigV2';
+import { snapToGrid, isCellBlocked } from './BotGoalSelectorV2';
+
+export interface PlannerResult {
+  path: Vec2[] | null;
+  type: 'FULL' | 'PARTIAL' | null;
+  nodesExpanded: number;
+  selectedGoal: Vec2 | null;
+}
+
+interface AStarNode {
+  x: number;
+  y: number;
+  g: number;
+  h: number;
+  f: number;
+  parent: AStarNode | null;
+}
+
+export function planPathV2(
+  start: Vec2,
+  goals: Vec2[],
+  inflatedObstacles: Rect[],
+  navBounds: Rect,
+  searchBounds: Rect,
+  maxNodes: number,
+  snapshot?: BotWorldSnapshotV2
+): PlannerResult {
+  if (goals.length === 0) return { path: null, type: null, nodesExpanded: 0, selectedGoal: null };
+
+  const startX = snapToGrid(start.x);
+  const startY = snapToGrid(start.y);
+  
+  if (isCellBlocked(startX, startY, inflatedObstacles, navBounds, snapshot)) {
+    return { path: null, type: null, nodesExpanded: 0, selectedGoal: null };
+  }
+
+  const openList: AStarNode[] = [];
+  const closedSet = new Set<string>();
+  const gs = BOT_CONFIG_V2.gridSize;
+
+  const startNode: AStarNode = {
+    x: startX,
+    y: startY,
+    g: 0,
+    h: Math.min(...goals.map(g => heuristic({x: startX, y: startY}, g))),
+    f: 0,
+    parent: null
+  };
+  startNode.f = startNode.h;
+  openList.push(startNode);
+
+  let bestNode: AStarNode = startNode;
+  let minH = startNode.h;
+  let nodesExpanded = 0;
+
+  while (openList.length > 0 && nodesExpanded < maxNodes) {
+    // Sort by f value
+    openList.sort((a, b) => a.f - b.f);
+    const current = openList.shift()!;
+    const key = `${current.x},${current.y}`;
+
+    if (closedSet.has(key)) continue;
+    closedSet.add(key);
+    nodesExpanded++;
+
+    if (current.h < minH) {
+      minH = current.h;
+      bestNode = current;
+    }
+
+    // Check if goal reached
+    const reachedGoal = goals.find(g => g.x === current.x && g.y === current.y);
+    if (reachedGoal) {
+      const path: Vec2[] = [];
+      let curr: AStarNode | null = current;
+      while (curr) {
+        path.push({ x: curr.x, y: curr.y });
+        curr = curr.parent;
+      }
+      return { path: path.reverse(), type: 'FULL', nodesExpanded, selectedGoal: reachedGoal };
+    }
+
+    // Neighbors (4-directional grid)
+    const neighbors = [
+      { x: current.x + gs, y: current.y },
+      { x: current.x - gs, y: current.y },
+      { x: current.x, y: current.y + gs },
+      { x: current.x, y: current.y - gs }
+    ];
+
+    for (const n of neighbors) {
+      const nKey = `${n.x},${n.y}`;
+      if (closedSet.has(nKey)) continue;
+
+      // Check search bounds and obstacle collisions
+      if (n.x < searchBounds.left || n.x > searchBounds.right || n.y < searchBounds.top || n.y > searchBounds.bottom) {
+        continue;
+      }
+
+      if (isCellBlocked(n.x, n.y, inflatedObstacles, navBounds, snapshot)) {
+        continue;
+      }
+
+      const gScore = current.g + gs;
+      const hScore = Math.min(...goals.map(g => heuristic(n, g)));
+      const fScore = gScore + hScore;
+
+      const existingOpen = openList.find(node => node.x === n.x && node.y === n.y);
+      if (existingOpen) {
+        if (gScore < existingOpen.g) {
+          existingOpen.g = gScore;
+          existingOpen.f = fScore;
+          existingOpen.parent = current;
+        }
+      } else {
+        openList.push({
+          x: n.x,
+          y: n.y,
+          g: gScore,
+          h: hScore,
+          f: fScore,
+          parent: current
+        });
+      }
+    }
+  }
+
+  // Fallback to partial path if full goal reached is not possible
+  if (bestNode && bestNode !== startNode) {
+    const path: Vec2[] = [];
+    let curr: AStarNode | null = bestNode;
+    while (curr) {
+      path.push({ x: curr.x, y: curr.y });
+      curr = curr.parent;
+    }
+    const closestGoal = goals.reduce((prev, curr) => {
+      const dPrev = heuristic(bestNode, prev);
+      const dCurr = heuristic(bestNode, curr);
+      return dCurr < dPrev ? curr : prev;
+    }, goals[0]);
+
+    return { path: path.reverse(), type: 'PARTIAL', nodesExpanded, selectedGoal: closestGoal };
+  }
+
+  return { path: null, type: null, nodesExpanded, selectedGoal: null };
+}
+
+export function simplifyPath(path: Vec2[]): Vec2[] {
+  if (path.length <= 2) return path;
+
+  const res: Vec2[] = [path[0]];
+  for (let i = 1; i < path.length - 1; i++) {
+    const prev = res[res.length - 1];
+    const curr = path[i];
+    const next = path[i+1];
+    
+    // Check if collinear
+    if ((curr.x - prev.x) * (next.y - curr.y) === (curr.y - prev.y) * (next.x - curr.x)) {
+      continue; // Skip collinear
+    }
+    res.push(curr);
+  }
+  res.push(path[path.length - 1]);
+  return res;
+}
+
+function heuristic(a: Vec2, b: Vec2): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+================================================================================
+2. MODULE: BotStateMachineV2.ts (FORENSIC EXCERPTS)
+================================================================================
+// Excerpt A: requestReplan (Lines 610 - 933)
+export function requestReplan(snapshot: BotWorldSnapshotV2, context: BotStateContextV2, inflatedObstacles: Rect[], forceStage: 'LOCAL'|'EXPANDED' = 'LOCAL') {
+  if (!context.awareness) return;
+
+  const recorder = BotFlightRecorder.getInstance();
+  const target = getBelowPlayerAnchor(context.awareness.lastKnownPlayerPosition, snapshot, inflatedObstacles);
+
+  // ... Logging candidates ...
+
+  const candidates = getGoalCandidates(snapshot, target, inflatedObstacles);
+
+  if (candidates.length === 0) {
+    return;
+  }
+
+  let searchBounds = { ...snapshot.navigationBounds };
+  if (forceStage === 'LOCAL') {
+    const minX = Math.min(snapshot.botPosition.x, target.x) - 160;
+    const maxX = Math.max(snapshot.botPosition.x, target.x) + 160;
+    const minY = Math.min(snapshot.botPosition.y, target.y) - 160;
+    const maxY = Math.max(snapshot.botPosition.y, target.y) + 160;
+    searchBounds = { left: minX, right: maxX, top: minY, bottom: maxY };
+  }
+
+  let res = planPathV2(snapshot.botPosition, candidates, inflatedObstacles, snapshot.navigationBounds, searchBounds, BOT_CONFIG_V2.plannerLocalMaxNodes, snapshot);
+  context.debug.nodesExpanded = res.nodesExpanded;
+
+  if (res.type !== 'FULL') {
+    // Stage 2 expanded fallback...
+    res = planPathV2(snapshot.botPosition, candidates, inflatedObstacles, snapshot.navigationBounds, snapshot.navigationBounds, BOT_CONFIG_V2.plannerExpandedMaxNodes, snapshot);
+  }
+
+  if (res.path) {
+    context.currentPath = simplifyPath(res.path);
+    context.currentPathType = res.type;
+    context.pathIndex = 0;
+    context.currentGoalAnchor = target;
+    context.currentPathGeneratedAtMs = snapshot.simTimeMs;
+    context.progress.plannerFailures = 0;
+    context.debug.plannerStatus = res.type === 'FULL' ? 'SUCCESS' : 'PARTIAL';
+  } else {
+    context.progress.plannerFailures++;
+    context.debug.plannerStatus = 'FAILED';
+  }
+}
+
+// Excerpt B: Progress failure & Rung 1 Recovery (Lines 384 - 469)
+    const progressOk = checkProgress(snapshot, context);
+    if (!progressOk) {
+      const oldState = context.currentState;
+      context.currentState = 'RECOVER';
+      context.progress.recoveryStartTimeMs = snapshot.simTimeMs;
+      context.progress.recoveryRung = 1;
+
+      // Rung 1: discard and replan expanded
+      requestReplan(snapshot, context, inflatedObstacles, 'EXPANDED');
+      if (context.currentPathType === 'FULL') {
+         const lastState = context.currentState;
+         context.currentState = 'CHASE';
+      }
+      return;
+    }
+
+================================================================================
+3. MODULE: BotGoalSelectorV2.ts (FORENSIC EXCERPTS)
+================================================================================
+export function getGoalCandidates(snapshot: BotWorldSnapshotV2, targetPos: Vec2, inflatedObstacles: Rect[]): Vec2[] {
+  const candidates: Vec2[] = [];
+  const startX = snapToGrid(targetPos.x);
+  const startY = snapToGrid(targetPos.y);
+  
+  const MAX_RINGS = 6;
+  const gs = BOT_CONFIG_V2.gridSize;
+
+  for (let r = 1; r <= MAX_RINGS; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const topCell = { x: startX + dx * gs, y: startY - r * gs };
+      const bottomCell = { x: startX + dx * gs, y: startY + r * gs };
+      
+      [topCell, bottomCell].forEach(c => {
+        if (isPointInPlayerTransitCorridor(c, snapshot)) return;
+        if (Math.abs(c.y - snapshot.playerPosition.y) < snapshot.rowGap * 0.85) return;
+        if (!isCellBlocked(c.x, c.y, inflatedObstacles, snapshot.navigationBounds, snapshot)) {
+          candidates.push(c);
+        }
+      });
+    }
+
+    for (let dy = -r + 1; dy <= r - 1; dy++) {
+      const leftCell = { x: startX - r * gs, y: startY + dy * gs };
+      const rightCell = { x: startX + r * gs, y: startY + dy * gs };
+      
+      [leftCell, rightCell].forEach(c => {
+        if (isPointInPlayerTransitCorridor(c, snapshot)) return;
+        if (Math.abs(c.y - snapshot.playerPosition.y) < snapshot.rowGap * 0.85) return;
+        if (!isCellBlocked(c.x, c.y, inflatedObstacles, snapshot.navigationBounds, snapshot)) {
+          candidates.push(c);
+        }
+      });
+    }
+    if (candidates.length >= 8) break;
+  }
+
+  // Sort by distance to targetPos
+  candidates.sort((a, b) => {
+    const da = Math.abs(a.x - targetPos.x) + Math.abs(a.y - targetPos.y);
+    const db = Math.abs(b.x - targetPos.x) + Math.abs(b.y - targetPos.y);
+    if (da !== db) return da - db;
+    if (a.x !== b.x) return a.x - b.x;
+    return a.y - b.y;
+  });
+
+  const unique: Vec2[] = [];
+  const seen = new Set<string>();
+  for (const c of candidates) {
+    const key = `${c.x},${c.y}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(c);
+      if (unique.length >= 8) break;
+    }
+  }
+
+  return unique;
+}
+
+================================================================================
+4. MODULE: BotControllerV2.ts (FORENSIC EXCERPTS)
+================================================================================
+  else if ((context.currentState === 'CHASE' || context.currentState === 'HOLD' || context.currentState === 'RECOVER') && context.currentPath) {
+    const speed = BOT_CONFIG_V2.chaseSpeed;
+    const dist = speed * (snapshot.deltaMs / 1000);
+    let targetWp = context.currentPath[context.pathIndex];
+    if (targetWp) {
+      const wdx = targetWp.x - snapshot.botPosition.x;
+      const wdy = targetWp.y - snapshot.botPosition.y;
+      const wdist = Math.sqrt(wdx*wdx + wdy*wdy);
+      if (wdist <= BOT_CONFIG_V2.waypointArrivalPx) {
+        const oldIndex = context.pathIndex;
+        context.pathIndex++;
+
+        if (context.pathIndex < context.currentPath.length) {
+          targetWp = context.currentPath[context.pathIndex];
+        }
+      }
+      
+      if (context.pathIndex < context.currentPath.length && targetWp) {
+        const ndx = targetWp.x - snapshot.botPosition.x;
+        const ndy = targetWp.y - snapshot.botPosition.y;
+        const ndist = Math.sqrt(ndx*ndx + ndy*ndy);
+        if (ndist > 0) {
+          dx = (ndx / ndist) * dist;
+          dy = (ndy / ndist) * dist;
+        }
+      }
+    }
+  }
+
+================================================================================
+5. MODULE: BotProgressMonitorV2.ts (FORENSIC EXCERPTS)
+================================================================================
+export function checkProgress(snapshot: BotWorldSnapshotV2, context: BotStateContextV2): boolean {
+  if (context.currentState !== 'CHASE' && context.currentState !== 'HOLD') {
+    return true;
+  }
+  const prog = context.progress;
+
+  if (context.attackSubState === 'STAGE' || context.attackSubState === 'STRIKE') {
+    prog.lastPos = { ...snapshot.botPosition };
+    prog.lastPosTimeMs = snapshot.simTimeMs;
+    prog.waypointStallTimeMs = snapshot.simTimeMs;
+    return true;
+  }
+
+  const timeSinceLast = snapshot.simTimeMs - prog.lastPosTimeMs;
+
+  if (timeSinceLast >= BOT_CONFIG_V2.monitorNoProgressWindowMs) {
+    const dx = snapshot.botPosition.x - prog.lastPos.x;
+    const dy = snapshot.botPosition.y - prog.lastPos.y;
+    const distMoved = Math.sqrt(dx * dx + dy * dy);
+
+    if (distMoved < BOT_CONFIG_V2.monitorNoProgressDistPx) {
+      return false; // NO PROGRESS DETECTED
+    }
+
+    prog.lastPos = { ...snapshot.botPosition };
+    prog.lastPosTimeMs = snapshot.simTimeMs;
+  }
+  return true;
+}

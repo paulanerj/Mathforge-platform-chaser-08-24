@@ -1,0 +1,401 @@
+================================================================================
+CIRCUIT CLIMB BOT AI RELEVANT SOURCE CODE CHUNKS (Task 10A)
+================================================================================
+This file compiles the untruncated source code blocks from the frozen Greenfield V2
+Bot AI that participate directly in the observed CHASE state zero-movement deadlock.
+
+--------------------------------------------------------------------------------
+SOURCE CHUNK 1: Goal Candidate & Below-Player Anchor Selection
+File: /src/games/circuit-climb/bot-ai-v2/BotGoalSelectorV2.ts
+--------------------------------------------------------------------------------
+
+export function getBelowPlayerAnchor(target: Vec2, snapshot: BotWorldSnapshotV2, inflatedObstacles: Rect[]): Vec2 {
+  const anchorX = target.x;
+  const anchorY = target.y + (snapshot.botBaseOffsetRows * snapshot.rowGap);
+  
+  let testX = snapToGrid(anchorX);
+  let testY = snapToGrid(anchorY);
+  
+  if (!isCellBlocked(testX, testY, inflatedObstacles, snapshot.navigationBounds, snapshot)) {
+    return { x: testX, y: testY };
+  }
+  
+  const gs = BOT_CONFIG_V2.gridSize;
+  const maxSearchRings = 10;
+  for (let r = 1; r <= maxSearchRings; r++) {
+    const steps = [
+      { dx: 0, dy: r * gs },
+      { dx: 0, dy: -r * gs },
+      { dx: -r * gs, dy: 0 },
+      { dx: r * gs, dy: 0 },
+      { dx: -r * gs, dy: r * gs },
+      { dx: r * gs, dy: r * gs },
+      { dx: -r * gs, dy: -r * gs },
+      { dx: r * gs, dy: -r * gs }
+    ];
+    for (const step of steps) {
+      const cx = testX + step.dx;
+      const cy = testY + step.dy;
+      if (!isCellBlocked(cx, cy, inflatedObstacles, snapshot.navigationBounds, snapshot)) {
+        return { x: cx, y: cy };
+      }
+    }
+  }
+  
+  return { x: testX, y: testY };
+}
+
+export function getGoalCandidates(snapshot: BotWorldSnapshotV2, targetPos: Vec2, inflatedObstacles: Rect[]): Vec2[] {
+  const candidates: Vec2[] = [];
+  const startX = snapToGrid(targetPos.x);
+  const startY = snapToGrid(targetPos.y);
+  
+  const MAX_RINGS = 6;
+  const gs = BOT_CONFIG_V2.gridSize;
+
+  for (let r = 1; r <= MAX_RINGS; r++) {
+    // Generate deterministic ring cells
+    for (let dx = -r; dx <= r; dx++) {
+      const topCell = { x: startX + dx * gs, y: startY - r * gs };
+      const bottomCell = { x: startX + dx * gs, y: startY + r * gs };
+      
+      [topCell, bottomCell].forEach(c => {
+        // Filter out by transit corridor protection
+        if (isPointInPlayerTransitCorridor(c, snapshot)) {
+          BotFlightRecorder.getInstance().recordEvent(
+            snapshot.simTimeMs,
+            'GREENFIELD_V2',
+            'CHASE',
+            'NONE',
+            'GOAL_SELECTION',
+            'PLAN_NODE_FILTERED_BY_TRANSIT_PROTECTION',
+            `Goal candidate at (${c.x}, ${c.y}) filtered by transit protection. Corridor limits: X[${(Math.min(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) - 12).toFixed(0)} - ${(Math.max(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) + 12).toFixed(0)}], Y[${(Math.min(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) - 60).toFixed(0)} - ${(Math.max(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) + 60).toFixed(0)}]. Player state: ${snapshot.playerMovementState}`,
+            snapshot.botPosition,
+            snapshot.playerPosition,
+            snapshot.botRadius,
+            snapshot.playerRadius,
+            0,
+            snapshot.obstacleRevision,
+            '',
+            0,
+            { coordinate: c, corridor: { xMin: Math.min(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) - 12, xMax: Math.max(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) + 12, yMin: Math.min(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) - 60, yMax: Math.max(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) + 60 } }
+          );
+          return;
+        }
+
+        // Filter out lateral camping candidates
+        if (Math.abs(c.y - snapshot.playerPosition.y) < snapshot.rowGap * 0.85) {
+          return;
+        }
+
+        if (!isCellBlocked(c.x, c.y, inflatedObstacles, snapshot.navigationBounds, snapshot)) {
+          candidates.push(c);
+        }
+      });
+    }
+
+    for (let dy = -r + 1; dy <= r - 1; dy++) {
+      const leftCell = { x: startX - r * gs, y: startY + dy * gs };
+      const rightCell = { x: startX + r * gs, y: startY + dy * gs };
+      
+      [leftCell, rightCell].forEach(c => {
+        // Filter out by transit corridor protection
+        if (isPointInPlayerTransitCorridor(c, snapshot)) {
+          BotFlightRecorder.getInstance().recordEvent(
+            snapshot.simTimeMs,
+            'GREENFIELD_V2',
+            'CHASE',
+            'NONE',
+            'GOAL_SELECTION',
+            'PLAN_NODE_FILTERED_BY_TRANSIT_PROTECTION',
+            `Goal candidate at (${c.x}, ${c.y}) filtered by transit protection. Corridor limits: X[${(Math.min(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) - 12).toFixed(0)} - ${(Math.max(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) + 12).toFixed(0)}], Y[${(Math.min(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) - 60).toFixed(0)} - ${(Math.max(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) + 60).toFixed(0)}]. Player state: ${snapshot.playerMovementState}`,
+            snapshot.botPosition,
+            snapshot.playerPosition,
+            snapshot.botRadius,
+            snapshot.playerRadius,
+            0,
+            snapshot.obstacleRevision,
+            '',
+            0,
+            { coordinate: c, corridor: { xMin: Math.min(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) - 12, xMax: Math.max(snapshot.playerRouteStartPosition!.x, snapshot.playerRouteDestination!.x) + 12, yMin: Math.min(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) - 60, yMax: Math.max(snapshot.playerRouteStartPosition!.y, snapshot.playerRouteDestination!.y) + 60 } }
+          );
+          return;
+        }
+
+        // Filter out lateral camping candidates
+        if (Math.abs(c.y - snapshot.playerPosition.y) < snapshot.rowGap * 0.85) {
+          return;
+        }
+
+        if (!isCellBlocked(c.x, c.y, inflatedObstacles, snapshot.navigationBounds, snapshot)) {
+          candidates.push(c);
+        }
+      });
+    }
+    
+    if (candidates.length >= 8) {
+      break;
+    }
+  }
+
+  // Sort by deterministic distance to targetPos
+  candidates.sort((a, b) => {
+    const da = Math.abs(a.x - targetPos.x) + Math.abs(a.y - targetPos.y);
+    const db = Math.abs(b.x - targetPos.x) + Math.abs(b.y - targetPos.y);
+    if (da !== db) return da - db;
+    if (a.x !== b.x) return a.x - b.x;
+    return a.y - b.y;
+  });
+
+  const unique: Vec2[] = [];
+  const seen = new Set<string>();
+  for (const c of candidates) {
+    const key = `${c.x},${c.y}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(c);
+      if (unique.length >= 8) break;
+    }
+  }
+
+  return unique;
+}
+
+
+--------------------------------------------------------------------------------
+SOURCE CHUNK 2: State Machine Logic, Proximity Checks & Recovery Overrides
+File: /src/games/circuit-climb/bot-ai-v2/BotStateMachineV2.ts
+--------------------------------------------------------------------------------
+
+// Snippet of updateStateMachine dealing with CHASE and attackSubState:
+  if (context.currentState === 'CHASE' || context.currentState === 'HOLD') {
+    if (!context.awareness) {
+      const oldState = context.currentState;
+      context.currentState = 'SEARCH';
+      // ... Event recordings ...
+      return;
+    }
+
+    // 1. Reset attack sequence if player started moving (transit protection & retarget zone)
+    if (snapshot.playerMovementState === 'MOVE_STARTED') {
+      if (context.attackSubState !== 'APPROACH' && context.attackSubState !== 'NONE') {
+        // ... Event recordings ...
+        context.attackSubState = 'APPROACH';
+        context.stageTimerMs = 0;
+        context.strikeTarget = null;
+      }
+    }
+
+    // 2. Initialize attackSubState if NONE
+    if (context.attackSubState === 'NONE') {
+      context.attackSubState = 'APPROACH';
+    }
+
+    // 3. Tick attack sequence sub-states
+    if (context.attackSubState === 'APPROACH') {
+      const anchor = getBelowPlayerAnchor(context.awareness.lastKnownPlayerPosition, snapshot, inflatedObstacles);
+      const adx = anchor.x - snapshot.botPosition.x;
+      const ady = anchor.y - snapshot.botPosition.y;
+      const distToAnchor = Math.sqrt(adx * adx + ady * ady);
+
+      if (distToAnchor <= 24) {
+        context.attackSubState = 'STAGE';
+        context.stageTimerMs = 180; // 180ms stabilizing beat
+        context.currentPath = null;
+        context.currentPathType = null;
+        // ... Event recordings ...
+      }
+    } else if (context.attackSubState === 'STAGE') {
+      context.stageTimerMs -= snapshot.deltaMs;
+      if (context.stageTimerMs <= 0) {
+        context.attackSubState = 'STRIKE';
+        context.strikeTarget = { x: snapshot.playerPosition.x, y: snapshot.playerPosition.y };
+        // ... Event recordings ...
+      }
+    } else if (context.attackSubState === 'STRIKE') {
+      if (snapshot.botPosition.y <= context.strikeTarget!.y) {
+        // ... Event recordings ...
+        context.attackSubState = 'APPROACH';
+        context.stageTimerMs = 0;
+        context.strikeTarget = null;
+        requestReplan(snapshot, context, inflatedObstacles, 'EXPANDED');
+      }
+    }
+
+    const progressOk = checkProgress(snapshot, context);
+    if (!progressOk) {
+      const oldState = context.currentState;
+      context.currentState = 'RECOVER';
+      context.progress.recoveryStartTimeMs = snapshot.simTimeMs;
+      context.progress.recoveryRung = 1;
+
+      // ... Event recordings ...
+
+      // Rung 1: discard and replan expanded
+      requestReplan(snapshot, context, inflatedObstacles, 'EXPANDED');
+      if (context.currentPathType === 'FULL') {
+         const lastState = context.currentState;
+         context.currentState = 'CHASE';
+         
+         // ... Event recordings ...
+      }
+      return;
+    }
+
+    if (shouldReplan(snapshot, context)) {
+      requestReplan(snapshot, context, inflatedObstacles, 'LOCAL');
+    }
+
+    const nextState = context.currentPathType === 'PARTIAL' ? 'HOLD' : 'CHASE';
+    if (context.currentState !== nextState) {
+      const oldState = context.currentState;
+      context.currentState = nextState;
+      // ... Event recordings ...
+    }
+  }
+
+
+--------------------------------------------------------------------------------
+SOURCE CHUNK 3: Progress Monitor Stall Thresholds
+File: /src/games/circuit-climb/bot-ai-v2/BotProgressMonitorV2.ts
+--------------------------------------------------------------------------------
+
+export function checkProgress(snapshot: BotWorldSnapshotV2, context: BotStateContextV2): boolean {
+  if (context.currentState !== 'CHASE' && context.currentState !== 'HOLD') {
+    return true; // only monitor during active pathing
+  }
+
+  const prog = context.progress;
+
+  if (context.attackSubState === 'STAGE' || context.attackSubState === 'STRIKE') {
+    prog.lastPos = { ...snapshot.botPosition };
+    prog.lastPosTimeMs = snapshot.simTimeMs;
+    prog.waypointStallTimeMs = snapshot.simTimeMs;
+    return true;
+  }
+
+  const recorder = BotFlightRecorder.getInstance();
+  const timeSinceLast = snapshot.simTimeMs - prog.lastPosTimeMs;
+
+  if (timeSinceLast >= BOT_CONFIG_V2.monitorNoProgressWindowMs) {
+    const dx = snapshot.botPosition.x - prog.lastPos.x;
+    const dy = snapshot.botPosition.y - prog.lastPos.y;
+    const distMoved = Math.sqrt(dx * dx + dy * dy);
+
+    if (distMoved < BOT_CONFIG_V2.monitorNoProgressDistPx) {
+      // ... Record Stall Event ...
+      return false; // NO PROGRESS
+    }
+
+    prog.lastPos = { ...snapshot.botPosition };
+    prog.lastPosTimeMs = snapshot.simTimeMs;
+  }
+
+  // Waypoint stall
+  if (context.pathIndex !== prog.lastWaypointIndex) {
+    prog.lastWaypointIndex = context.pathIndex;
+    prog.waypointStallTimeMs = snapshot.simTimeMs;
+  } else {
+    const stallTime = snapshot.simTimeMs - prog.waypointStallTimeMs;
+    if (stallTime >= BOT_CONFIG_V2.monitorWaypointStallMs) {
+      // ... Record Waypoint Stall Event ...
+      return false; // WAYPOINT STALL
+    }
+  }
+
+  // Two cell oscillation
+  const currentCell = `${snapToGrid(snapshot.botPosition.x)},${snapToGrid(snapshot.botPosition.y)}`;
+  if (prog.recentCells[prog.recentCells.length - 1] !== currentCell) {
+    prog.recentCells.push(currentCell);
+    if (prog.recentCells.length > 5) prog.recentCells.shift();
+    
+    // Check if oscillating between two cells
+    if (prog.recentCells.length >= 4) {
+      const c1 = prog.recentCells[prog.recentCells.length - 1];
+      const c2 = prog.recentCells[prog.recentCells.length - 2];
+      const c3 = prog.recentCells[prog.recentCells.length - 3];
+      const c4 = prog.recentCells[prog.recentCells.length - 4];
+      if (c1 === c3 && c2 === c4 && c1 !== c2) {
+        // ... Record Oscillation Event ...
+        return false; // OSCILLATION
+      }
+    }
+  }
+
+  return true;
+}
+
+
+--------------------------------------------------------------------------------
+SOURCE CHUNK 4: Path Completion and Stopping Mechanics
+File: /src/games/circuit-climb/bot-ai-v2/BotControllerV2.ts
+--------------------------------------------------------------------------------
+
+  } else if ((context.currentState === 'CHASE' || context.currentState === 'HOLD' || context.currentState === 'RECOVER') && context.currentPath) {
+    const speed = BOT_CONFIG_V2.chaseSpeed;
+    const dist = speed * (snapshot.deltaMs / 1000);
+    let targetWp = context.currentPath[context.pathIndex];
+    if (targetWp) {
+      const wdx = targetWp.x - snapshot.botPosition.x;
+      const wdy = targetWp.y - snapshot.botPosition.y;
+      const wdist = Math.sqrt(wdx*wdx + wdy*wdy);
+      if (wdist <= BOT_CONFIG_V2.waypointArrivalPx) {
+        const oldIndex = context.pathIndex;
+        context.pathIndex++;
+
+        recorder.recordEvent(
+          snapshot.simTimeMs,
+          'GREENFIELD_V2',
+          context.currentState,
+          'NONE',
+          'MOVEMENT',
+          'WAYPOINT_REACHED',
+          `Bot arrived at waypoint index ${oldIndex} (${targetWp.x.toFixed(0)}, ${targetWp.y.toFixed(0)}) within arrival tolerance ${BOT_CONFIG_V2.waypointArrivalPx}px`,
+          snapshot.botPosition,
+          snapshot.playerPosition,
+          snapshot.botRadius,
+          snapshot.playerRadius,
+          context.awareness?.id || 0,
+          snapshot.obstacleRevision,
+          context.debug.plannerStatus,
+          context.pathIndex,
+          { waypointIndex: oldIndex, coordinate: targetWp }
+        );
+
+        if (context.pathIndex < context.currentPath.length) {
+          targetWp = context.currentPath[context.pathIndex];
+        }
+      }
+      
+      if (context.pathIndex < context.currentPath.length && targetWp) {
+        const ndx = targetWp.x - snapshot.botPosition.x;
+        const ndy = targetWp.y - snapshot.botPosition.y;
+        const ndist = Math.sqrt(ndx*ndx + ndy*ndy);
+        if (ndist > 0) {
+          dx = (ndx / ndist) * dist;
+          dy = (ndy / ndist) * dist;
+        }
+      }
+    }
+  }
+
+  // Log zero movement intent if calculated in active states
+  if ((context.currentState === 'CHASE' || context.currentState === 'HOLD' || context.currentState === 'RECOVER') && dx === 0 && dy === 0 && context.attackSubState !== 'STAGE') {
+    recorder.recordEvent(
+      snapshot.simTimeMs,
+      'GREENFIELD_V2',
+      context.currentState,
+      'NONE',
+      'MOVEMENT',
+      'ZERO_MOVEMENT_INTENT',
+      `Zero movement intent calculated during active state ${context.currentState}. Waypoint index: ${context.pathIndex}/${context.currentPath?.length || 0}`,
+      snapshot.botPosition,
+      snapshot.playerPosition,
+      snapshot.botRadius,
+      snapshot.playerRadius,
+      context.awareness?.id || 0,
+      snapshot.obstacleRevision,
+      context.debug.plannerStatus,
+      context.pathIndex
+    );
+  }
