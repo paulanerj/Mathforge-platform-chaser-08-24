@@ -7,6 +7,18 @@ export type CircuitClimbStatus = 'idle' | 'playing' | 'paused' | 'failed' | 'suc
 
 export type MovementMode = 'circuit' | 'hop';
 
+export interface Vec2 {
+  x: number;
+  y: number;
+}
+
+export interface Rect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
 export interface Platform {
   id: string;
   row: number; // Row index (0, 1, 2, ...)

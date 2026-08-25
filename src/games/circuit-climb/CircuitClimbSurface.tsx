@@ -3,10 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { useCircuitClimbPrototypeRuntime } from './runtime/useCircuitClimbPrototypeRuntime';
-import { CircuitClimbUnifiedConsole } from './components/CircuitClimbUnifiedConsole';
-import { CircuitClimbV3DiagnosticPanel } from './components/CircuitClimbV3DiagnosticPanel';
 import './styles/circuit-climb.css';
 
 interface CircuitClimbSurfaceProps {
@@ -32,9 +30,6 @@ export const CircuitClimbSurface: React.FC<CircuitClimbSurfaceProps> = ({
     setViewScale,
     setRouteTurns,
     setDifficulty,
-    setAiImplementation,
-    setBringUpStage,
-    setShowV2Telemetry,
     resetViewSettings,
     exportViewConfig,
     setShowConfig,
@@ -61,28 +56,10 @@ export const CircuitClimbSurface: React.FC<CircuitClimbSurfaceProps> = ({
     showConfig,
     configText,
     difficulty,
-    aiImplementation,
-    showV2Telemetry,
-    bringUpStage,
   } = viewModel;
 
   const copyStatusRef = useRef<HTMLDivElement | null>(null);
   const configOutputRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const [v3Diag, setV3Diag] = useState<any>(null);
-  const [v3Context, setV3Context] = useState<any>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (viewModel.debug?.getV3Diagnostics) {
-        setV3Diag(viewModel.debug.getV3Diagnostics());
-      }
-      if (viewModel.debug?.getBotV3Debug) {
-        setV3Context(viewModel.debug.getBotV3Debug());
-      }
-    }, 100);
-    return () => clearInterval(timer);
-  }, [viewModel.debug]);
 
   const handleCopyConfig = async () => {
     if (!configOutputRef.current) return;
@@ -173,44 +150,6 @@ export const CircuitClimbSurface: React.FC<CircuitClimbSurfaceProps> = ({
         {messageText}
       </div>
 
-      {showV2Telemetry && viewModel.debug && (
-        <div style={{
-          position: 'absolute',
-          top: '120px',
-          right: '20px',
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          color: '#0f0',
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          padding: '12px',
-          borderRadius: '8px',
-          border: '1px solid #333',
-          zIndex: 100,
-          pointerEvents: 'none',
-          width: '280px'
-        }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '13px', borderBottom: '1px solid #444', paddingBottom: '4px' }}>V2 AI TELEMETRY</h3>
-          {(() => {
-            const botDebug = viewModel.debug.getBotV2Debug();
-            if (!botDebug) return <div>No V2 Snapshot Active</div>;
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div><strong>Impl:</strong> {botDebug.implementation}</div>
-                <div><strong>State:</strong> {botDebug.state}</div>
-                <div><strong>Gap:</strong> {botDebug.edgeGap.toFixed(1)}</div>
-                <div><strong>Aware ID:</strong> {botDebug.awarenessId}</div>
-                <div><strong>Aware Timer:</strong> {botDebug.awarenessRemainingMs}ms</div>
-                <div><strong>Excitement:</strong> {botDebug.excitementPlayed ? 'YES' : 'NO'}</div>
-                <div><strong>Plan Stage:</strong> {botDebug.plannerStage}</div>
-                <div><strong>Plan Status:</strong> {botDebug.plannerStatus} ({botDebug.nodesExpanded} nodes)</div>
-                <div><strong>Path:</strong> {botDebug.pathLength} nodes</div>
-                <div><strong>Recovery:</strong> Rung {botDebug.recoveryRung}</div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
       {/* 4. Bottom action bar controls */}
       <div id="bottomBar" className="mathforge-bottom-bar">
         <button className="mathforge-action-btn" type="button" onClick={() => togglePause()}>
@@ -287,75 +226,7 @@ export const CircuitClimbSurface: React.FC<CircuitClimbSurfaceProps> = ({
           </label>
 
           <div className="rangeHeading secondaryRangeHeading" style={{ marginTop: '16px' }}>
-            <label htmlFor="aiImplementationSelect">BOT AI</label>
-          </div>
-          <select
-            id="aiImplementationSelect"
-            value={aiImplementation || 'PLATFORM_GRAPH_V3'}
-            onChange={(e) => setAiImplementation(e.target.value as 'PLATFORM_GRAPH_V3' | 'V2_SIMPLIFIED' | 'V2_FROZEN' | 'LEGACY')}
-            style={{
-              width: '100%',
-              backgroundColor: '#1E293B',
-              color: '#F8FAFC',
-              border: '1px solid #475569',
-              borderRadius: '6px',
-              padding: '8px 12px',
-              marginTop: '4px',
-              fontSize: '14px',
-              outline: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="PLATFORM_GRAPH_V3">PLATFORM GRAPH V3 (PM Default)</option>
-            <option value="V2_SIMPLIFIED">SIMPLIFIED HYBRID V2</option>
-            <option value="V2_FROZEN">GREENFIELD V2 (Frozen)</option>
-            <option value="LEGACY">V1 LEGACY</option>
-          </select>
-
-          {(aiImplementation === 'V2_SIMPLIFIED' || aiImplementation === 'V2_FROZEN') && (
-            <>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#B3B3B3', marginTop: '16px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <input 
-                  type="checkbox" 
-                  checked={showV2Telemetry} 
-                  onChange={(e) => setShowV2Telemetry(e.target.checked)} 
-                  style={{ accentColor: '#4CAF50' }}
-                />
-                Show V2 Telemetry
-              </label>
-
-              <div className="rangeHeading secondaryRangeHeading" style={{ marginTop: '16px' }}>
-                <label htmlFor="bringUpStageSelect">BRING-UP STAGE</label>
-              </div>
-              <select
-                id="bringUpStageSelect"
-                value={bringUpStage || 'NORMAL'}
-                onChange={(e) => setBringUpStage(e.target.value as any)}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#1E293B',
-                  color: '#F8FAFC',
-                  border: '1px solid #475569',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
-                  marginTop: '4px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="NORMAL">NORMAL (Full V2)</option>
-                <option value="STAGE_A">STAGE A (Force Static Bot)</option>
-                <option value="STAGE_B">STAGE B (Diagnostic Movement)</option>
-                <option value="STAGE_C">STAGE C (V2 Init, No Move)</option>
-                <option value="STAGE_D">STAGE D (Planner On, No Move)</option>
-                <option value="STAGE_E">STAGE E (Full V2 Climb)</option>
-              </select>
-            </>
-          )}
-
-          <div className="rangeHeading secondaryRangeHeading" style={{ marginTop: '16px' }}>
-            <label htmlFor="difficultySelect">AI BOT DIFFICULTY</label>
+            <label htmlFor="difficultySelect">DIFFICULTY</label>
           </div>
           <select
             id="difficultySelect"
@@ -546,28 +417,6 @@ export const CircuitClimbSurface: React.FC<CircuitClimbSurfaceProps> = ({
             </button>
           </div>
         </section>
-      )}
-      {/* D. Unified Event Console */}
-      {showV2Telemetry && <CircuitClimbUnifiedConsole />}
-      {/* E. V3 Diagnostic Panel */}
-      {aiImplementation === 'PLATFORM_GRAPH_V3' && v3Diag && (
-        <CircuitClimbV3DiagnosticPanel
-          activeUiEngine={v3Diag.activeUiEngine}
-          actualControllerCalled={v3Diag.actualControllerCalled}
-          botContextV3={v3Context}
-          v3UpdateCount={v3Diag.v3UpdateCount}
-          v2FrozenUpdateCount={v3Diag.v2FrozenUpdateCount}
-          v2SimplifiedUpdateCount={v3Diag.v2SimplifiedUpdateCount}
-          legacyUpdateCount={v3Diag.legacyUpdateCount}
-          playerPosition={v3Diag.playerPosition}
-          playerSupportingPlatformId={v3Diag.playerSupportingPlatformId}
-          playerDestinationPlatformId={v3Diag.playerDestinationPlatformId}
-          botPosition={v3Diag.botPosition}
-          intendedMovement={v3Diag.intendedMovement}
-          collisionResolvedMovement={v3Diag.collisionResolvedMovement}
-          committedMovement={v3Diag.committedMovement}
-          lastFailureReason={v3Diag.lastFailureReason}
-        />
       )}
     </div>
   );
