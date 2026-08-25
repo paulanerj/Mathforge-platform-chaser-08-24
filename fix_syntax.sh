@@ -1,1 +1,0 @@
-sed -i 's/function TestApp({ console.log("TestApp Rendered!");  onMount }: { onMount: (api: any) => void }) {/function TestApp({ onMount }: { onMount: (api: any) => void }) { console.log("TestApp Rendered!");/g' src/games/circuit-climb/bot-ai-v2/botAI.v2.test.ts

@@ -1,1 +1,0 @@
-sed -i 's/await new Promise(r => setTimeout(r, 100));/window.dispatchEvent(new Event('\''resize'\'')); await new Promise(r => setTimeout(r, 100));/g' src/games/circuit-climb/bot-ai-v2/botAI.v2.test.ts

@@ -1,1 +1,0 @@
-sed -i 's/beforeEach(() => {/beforeEach(() => {\n    window.ResizeObserver = class { observe() { this.cb([{contentRect:{width:400,height:800}}]);} unobserve() {} disconnect() {} constructor(cb) { this.cb = cb; } };/g' src/games/circuit-climb/bot-ai-v2/botAI.v2.test.ts

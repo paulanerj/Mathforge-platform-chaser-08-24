@@ -1,1 +1,0 @@
-sed -i 's/if (!canvas || !app) return;/if (!canvas || !app) { console.log("BAILING OUT!", {canvas: !!canvas, app: !!app}); return; }/g' src/games/circuit-climb/runtime/useCircuitClimbPrototypeRuntime.ts
